@@ -18,12 +18,12 @@ type FetcherBuilder func() (protocols []string, builder func() fetcher.Fetcher)
 type Listener func(event *Event)
 
 type TaskInfo struct {
-	ID       string
-	Res      *base.Resource
-	Opts     *base.Options
-	Status   base.Status
-	Files    map[string]*base.FileInfo
-	Progress *Progress
+	ID       string                    `json:"id"`
+	Res      *base.Resource            `json:"res"`
+	Opts     *base.Options             `json:"opts"`
+	Status   base.Status               `json:"status"`
+	Files    map[string]*base.FileInfo `json:"files"`
+	Progress *Progress                 `json:"progress"`
 
 	fetcher fetcher.Fetcher
 	timer   *util.Timer
@@ -32,11 +32,11 @@ type TaskInfo struct {
 
 type Progress struct {
 	// 下载耗时(纳秒)
-	Used int64
+	Used int64 `json:"used"`
 	// 每秒下载字节数
-	Speed int64
+	Speed int64 `json:"speed"`
 	// 已下载的字节数
-	Downloaded int64
+	Downloaded int64 `json:"downloaded"`
 }
 
 type Downloader struct {

@@ -13,7 +13,7 @@ const (
 )
 
 type Event struct {
-	Key  EventKey
-	Task *TaskInfo
-	Err  error
+	Key  EventKey  `json:"key"`
+	Task *TaskInfo `json:"task"`
+	Err  error     `json:"err"`
 }
