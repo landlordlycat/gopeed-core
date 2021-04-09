@@ -16,10 +16,10 @@ type Resource struct {
 	// 是否支持断点下载
 	Range bool `json:"range"`
 	// 资源所包含的文件列表
-	Files []*FileInfo `json:"files"`
+	Files []*File `json:"files"`
 }
 
-type FileInfo struct {
+type File struct {
 	Name string `json:"name"`
 	Path string `json:"path"`
 	Size int64  `json:"size"`

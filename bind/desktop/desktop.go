@@ -16,8 +16,8 @@ func Listen() *C.char {
 }
 
 //export Create
-func Create(url string, opts string) *C.char {
-	if err := bind.Create(url, opts); err != nil {
+func Create(url *C.char, opts *C.char) *C.char {
+	if err := bind.Create(C.GoString(url), C.GoString(opts)); err != nil {
 		return C.CString(err.Error())
 	}
 	return nil

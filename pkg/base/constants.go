@@ -2,14 +2,14 @@ package base
 
 import "errors"
 
-type Status int
+type Status string
 
 const (
-	DownloadStatusReady Status = iota
-	DownloadStatusStart
-	DownloadStatusPause
-	DownloadStatusError
-	DownloadStatusDone
+	DownloadStatusReady = "ready"
+	DownloadStatusStart = "start"
+	DownloadStatusPause = "pause"
+	DownloadStatusError = "error"
+	DownloadStatusDone  = "done"
 )
 
 const (

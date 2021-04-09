@@ -79,7 +79,7 @@ func (f *Fetcher) Resolve(req *base.Request) (*base.Resource, error) {
 	res := &base.Resource{
 		Req:   req,
 		Range: false,
-		Files: []*base.FileInfo{},
+		Files: []*base.File{},
 	}
 	if base.HttpCodePartialContent == httpResp.StatusCode {
 		// 返回206响应码表示支持断点下载
@@ -106,7 +106,7 @@ func (f *Fetcher) Resolve(req *base.Request) (*base.Resource, error) {
 	} else {
 		return nil, NewRequestError(httpResp.StatusCode, httpResp.Status)
 	}
-	file := &base.FileInfo{
+	file := &base.File{
 		Size: res.TotalSize,
 	}
 	contentDisposition := httpResp.Header.Get(base.HttpHeaderContentDisposition)

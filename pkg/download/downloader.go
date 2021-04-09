@@ -17,13 +17,12 @@ import (
 type FetcherBuilder func() (protocols []string, builder func() fetcher.Fetcher)
 type Listener func(event *Event)
 
-type TaskInfo struct {
-	ID       string                    `json:"id"`
-	Res      *base.Resource            `json:"res"`
-	Opts     *base.Options             `json:"opts"`
-	Status   base.Status               `json:"status"`
-	Files    map[string]*base.FileInfo `json:"files"`
-	Progress *Progress                 `json:"progress"`
+type Task struct {
+	ID       string         `json:"id"`
+	Res      *base.Resource `json:"res"`
+	Opts     *base.Options  `json:"opts"`
+	Status   base.Status    `json:"status"`
+	Progress *Progress      `json:"progress"`
 
 	fetcher fetcher.Fetcher
 	timer   *util.Timer
@@ -42,8 +41,9 @@ type Progress struct {
 type Downloader struct {
 	*controller.DefaultController
 	fetchBuilders map[string]func() fetcher.Fetcher
-	tasks         map[string]*TaskInfo
+	tasks         map[string]*Task
 	listener      Listener
+	eventCh       chan *Event
 }
 
 func NewDownloader(fbs ...FetcherBuilder) *Downloader {
@@ -55,7 +55,7 @@ func NewDownloader(fbs ...FetcherBuilder) *Downloader {
 			d.fetchBuilders[strings.ToUpper(p)] = builder
 		}
 	}
-	d.tasks = make(map[string]*TaskInfo)
+	d.tasks = make(map[string]*Task)
 
 	// 每秒统计一次下载速度
 	go func() {
@@ -114,7 +114,7 @@ func (d *Downloader) Create(res *base.Resource, opts *base.Options) (err error) 
 		return
 	}
 	id := uuid.New().String()
-	task := &TaskInfo{
+	task := &Task{
 		ID:       id,
 		Res:      res,
 		Opts:     opts,
@@ -134,6 +134,7 @@ func (d *Downloader) Create(res *base.Resource, opts *base.Options) (err error) 
 	go func() {
 		err = fetcher.Wait()
 		if err != nil {
+			task.Status = base.DownloadStatusError
 			d.emit(EventKeyError, task, err)
 		} else {
 			task.Progress.Used = task.timer.Used()
@@ -146,6 +147,7 @@ func (d *Downloader) Create(res *base.Resource, opts *base.Options) (err error) 
 			}
 			task.Progress.Speed = task.Res.TotalSize / used
 			task.Progress.Downloaded = task.Res.TotalSize
+			task.Status = base.DownloadStatusDone
 			d.emit(EventKeyDone, task)
 		}
 		d.emit(EventKeyFinally, task, err)
@@ -173,28 +175,33 @@ func (d *Downloader) Continue(id string) {
 
 func (d *Downloader) Listener(fn Listener) {
 	d.listener = fn
+	d.eventCh = make(chan *Event)
+	go func() {
+		for event := range d.eventCh {
+			d.listener(event)
+		}
+	}()
 }
 
-func (d *Downloader) emit(eventKey EventKey, task *TaskInfo, errs ...error) {
+func (d *Downloader) emit(eventKey EventKey, task *Task, errs ...error) {
 	if d.listener != nil {
 		var err error
 		if len(errs) > 0 {
 			err = errs[0]
 		}
-		d.listener(&Event{
+		d.eventCh <- &Event{
 			Key:  eventKey,
 			Task: task,
 			Err:  err,
-		})
+		}
 	}
 }
 
 var defaultDownloader = NewDownloader(http.FetcherBuilder)
 
 type boot struct {
-	url      string
-	extra    interface{}
-	listener Listener
+	url   string
+	extra interface{}
 }
 
 func (b *boot) URL(url string) *boot {
@@ -215,7 +222,7 @@ func (b *boot) Resolve() (*base.Resource, error) {
 }
 
 func (b *boot) Listener(listener Listener) *boot {
-	b.listener = listener
+	defaultDownloader.Listener(listener)
 	return b
 }
 
@@ -224,7 +231,6 @@ func (b *boot) Create(opts *base.Options) error {
 	if err != nil {
 		return err
 	}
-	defaultDownloader.Listener(b.listener)
 	return defaultDownloader.Create(res, opts)
 }
 

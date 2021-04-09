@@ -15,7 +15,7 @@ func TestFetcher_Resolve(t *testing.T) {
 	testResolve(test.StartTestFileServer, &base.Resource{
 		TotalSize: test.BuildSize,
 		Range:     true,
-		Files: []*base.FileInfo{
+		Files: []*base.File{
 			{
 				Name: test.BuildName,
 				Size: test.BuildSize,
@@ -25,7 +25,7 @@ func TestFetcher_Resolve(t *testing.T) {
 	testResolve(test.StartTestChunkedServer, &base.Resource{
 		TotalSize: 0,
 		Range:     false,
-		Files: []*base.FileInfo{
+		Files: []*base.File{
 			{
 				Name: test.BuildName,
 				Size: 0,

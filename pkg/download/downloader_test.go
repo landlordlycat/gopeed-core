@@ -25,7 +25,7 @@ func TestDownloader_Resolve(t *testing.T) {
 		Req:       req,
 		TotalSize: test.BuildSize,
 		Range:     true,
-		Files: []*base.FileInfo{
+		Files: []*base.File{
 			{
 				Name: test.BuildName,
 				Path: "",

@@ -4,18 +4,31 @@ import (
 	"encoding/json"
 	"github.com/monkeyWie/gopeed-core/pkg/base"
 	"github.com/monkeyWie/gopeed-core/pkg/download"
+	"sync"
 )
 
-var eventCh = make(chan *download.Event)
+var (
+	l sync.Mutex
+	q = make([]*download.Event, 0)
+)
 
 func init() {
 	download.Boot().Listener(func(event *download.Event) {
-		eventCh <- event
+		l.Lock()
+		defer l.Unlock()
+		q = append(q, event)
 	})
 }
 
 func Listen() string {
-	buf, _ := json.Marshal(<-eventCh)
+	l.Lock()
+	defer l.Unlock()
+	if len(q) == 0 {
+		return ""
+	}
+	event := q[len(q)-1]
+	buf, _ := json.Marshal(event)
+	q = q[:len(q)-1]
 	return string(buf)
 }
 
