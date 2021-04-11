@@ -26,9 +26,9 @@ func Listen() string {
 	if len(q) == 0 {
 		return ""
 	}
-	event := q[len(q)-1]
+	event := q[0]
 	buf, _ := json.Marshal(event)
-	q = q[:len(q)-1]
+	q = q[1:]
 	return string(buf)
 }
 
