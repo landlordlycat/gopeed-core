@@ -6,10 +6,10 @@ import (
 	"github.com/monkeyWie/gopeed-core/bind"
 )
 
-func Listen() string {
-	return bind.Listen()
+func Start(ip string, port int) string {
+	return bind.Start(ip, port)
 }
 
-func Create(url string, opts string) error {
-	return bind.Create(url, opts)
+func Stop() string {
+	return bind.Stop()
 }

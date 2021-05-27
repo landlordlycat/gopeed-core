@@ -106,6 +106,9 @@ func (d *Downloader) Create(res *base.Resource, opts *base.Options) (err error) 
 	if err != nil {
 		return
 	}
+	if opts == nil {
+		opts = &base.Options{}
+	}
 	if !res.Range || opts.Connections < 1 {
 		opts.Connections = 1
 	}
@@ -125,13 +128,13 @@ func (d *Downloader) Create(res *base.Resource, opts *base.Options) (err error) 
 		locker:   new(sync.Mutex),
 	}
 	d.tasks[id] = task
-	task.timer.Start()
-	d.emit(EventKeyStart, task)
 	err = fetcher.Start()
 	if err != nil {
 		return
 	}
 	go func() {
+		task.timer.Start()
+		d.emit(EventKeyStart, task)
 		err = fetcher.Wait()
 		if err != nil {
 			task.Status = base.DownloadStatusError
@@ -173,14 +176,8 @@ func (d *Downloader) Continue(id string) {
 	d.emit(EventKeyContinue, task)
 }
 
-func (d *Downloader) Listener(fn Listener) {
+func (d *Downloader) SetListener(fn Listener) {
 	d.listener = fn
-	d.eventCh = make(chan *Event)
-	go func() {
-		for event := range d.eventCh {
-			d.listener(event)
-		}
-	}()
 }
 
 func (d *Downloader) emit(eventKey EventKey, task *Task, errs ...error) {
@@ -189,51 +186,30 @@ func (d *Downloader) emit(eventKey EventKey, task *Task, errs ...error) {
 		if len(errs) > 0 {
 			err = errs[0]
 		}
-		d.eventCh <- &Event{
+		d.listener(&Event{
 			Key:  eventKey,
 			Task: task,
 			Err:  err,
-		}
+		})
 	}
 }
 
 var defaultDownloader = NewDownloader(http.FetcherBuilder)
 
-type boot struct {
-	url   string
-	extra interface{}
+func Resolve(request *base.Request) (*base.Resource, error) {
+	return defaultDownloader.Resolve(request)
 }
 
-func (b *boot) URL(url string) *boot {
-	b.url = url
-	return b
+func SetListener(listener Listener) {
+	defaultDownloader.SetListener(listener)
 }
 
-func (b *boot) Extra(extra interface{}) *boot {
-	b.extra = extra
-	return b
-}
-
-func (b *boot) Resolve() (*base.Resource, error) {
-	return defaultDownloader.Resolve(&base.Request{
-		URL:   b.url,
-		Extra: b.extra,
-	})
-}
-
-func (b *boot) Listener(listener Listener) *boot {
-	defaultDownloader.Listener(listener)
-	return b
-}
-
-func (b *boot) Create(opts *base.Options) error {
-	res, err := b.Resolve()
-	if err != nil {
-		return err
+func Create(request *base.Request, res *base.Resource, opts *base.Options) (err error) {
+	if res == nil {
+		res, err = defaultDownloader.Resolve(request)
+		if err != nil {
+			return err
+		}
 	}
 	return defaultDownloader.Create(res, opts)
-}
-
-func Boot() *boot {
-	return &boot{}
 }

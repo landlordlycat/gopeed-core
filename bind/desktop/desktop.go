@@ -6,19 +6,14 @@ import (
 	"github.com/monkeyWie/gopeed-core/bind"
 )
 
-func main() {
+func main() {}
 
+//export Start
+func Start(ip *C.char, port int) *C.char {
+	return C.CString(bind.Start(C.GoString(ip), port))
 }
 
-//export Listen
-func Listen() *C.char {
-	return C.CString(bind.Listen())
-}
-
-//export Create
-func Create(url *C.char, opts *C.char) *C.char {
-	if err := bind.Create(C.GoString(url), C.GoString(opts)); err != nil {
-		return C.CString(err.Error())
-	}
-	return nil
+//export Stop
+func Stop() *C.char {
+	return C.CString(bind.Stop())
 }

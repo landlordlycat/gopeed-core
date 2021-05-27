@@ -2,50 +2,28 @@ package bind
 
 import (
 	"encoding/json"
-	"github.com/monkeyWie/gopeed-core/pkg/base"
-	"github.com/monkeyWie/gopeed-core/pkg/download"
-	"sync"
+	"github.com/monkeyWie/gopeed-core/pkg/rest"
 )
 
-var (
-	l sync.Mutex
-	q = make([]*download.Event, 0)
-)
-
-func init() {
-	download.Boot().Listener(func(event *download.Event) {
-		l.Lock()
-		defer l.Unlock()
-		q = append(q, event)
-	})
+func Start(ip string, port int) string {
+	var r StartResult
+	r.Port, r.Err = rest.Start(ip, port)
+	return toJSON(r)
 }
 
-func Listen() string {
-	l.Lock()
-	defer l.Unlock()
-	if len(q) == 0 {
-		return ""
+func Stop() string {
+	if err := rest.Stop(); err != nil {
+		return err.Error()
 	}
-	event := q[0]
-	buf, _ := json.Marshal(event)
-	q = q[1:]
+	return ""
+}
+
+type StartResult struct {
+	Port int   `json:"port"`
+	Err  error `json:"err"`
+}
+
+func toJSON(v interface{}) string {
+	buf, _ := json.Marshal(v)
 	return string(buf)
-}
-
-func Create(url string, opts string) error {
-	t, err := toOptions(opts)
-	if err != nil {
-		return err
-	}
-	return download.Boot().
-		URL(url).
-		Create(t)
-}
-
-func toOptions(str string) (*base.Options, error) {
-	var opts base.Options
-	if err := json.Unmarshal([]byte(str), &opts); err != nil {
-		return nil, err
-	}
-	return &opts, nil
 }
