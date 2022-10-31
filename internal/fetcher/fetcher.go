@@ -1,13 +1,13 @@
 package fetcher
 
 import (
-	"github.com/monkeyWie/gopeed-core/internal/controller"
-	"github.com/monkeyWie/gopeed-core/pkg/base"
+	"github.com/monkeyWie/gopeed/internal/controller"
+	"github.com/monkeyWie/gopeed/pkg/base"
 )
 
 // 对应协议的下载支持
 type Fetcher interface {
-	Setup(ctl controller.Controller)
+	Setup(ctl controller.Controller) error
 	// 解析请求
 	Resolve(req *base.Request) (res *base.Resource, err error)
 	// 创建任务
@@ -15,6 +15,7 @@ type Fetcher interface {
 	Start() (err error)
 	Pause() (err error)
 	Continue() (err error)
+	Close() (err error)
 
 	// 获取任务各个文件下载进度
 	Progress() Progress
@@ -22,14 +23,25 @@ type Fetcher interface {
 	Wait() (err error)
 }
 
+type FetcherBuilder interface {
+	Schemes() []string
+	Build() Fetcher
+
+	// Store 存储任务
+	Store(fetcher Fetcher) (any, error)
+	// Restore 恢复任务
+	Restore() (v any, f func(res *base.Resource, opts *base.Options, v any) Fetcher)
+}
+
 type DefaultFetcher struct {
 	Ctl    controller.Controller
 	DoneCh chan error
 }
 
-func (f *DefaultFetcher) Setup(ctl controller.Controller) {
+func (f *DefaultFetcher) Setup(ctl controller.Controller) (err error) {
 	f.Ctl = ctl
 	f.DoneCh = make(chan error, 1)
+	return
 }
 
 func (f *DefaultFetcher) Wait() (err error) {

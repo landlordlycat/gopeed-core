@@ -1,6 +1,6 @@
-[![Test Status](https://github.com/monkeyWie/gopeed-core/workflows/test/badge.svg)](https://github.com/monkeyWie/gopeed-core/actions?query=workflow%3Atest)
-[![Codecov](https://codecov.io/gh/monkeyWie/gopeed-core/branch/master/graph/badge.svg)](https://codecov.io/gh/monkeyWie/gopeed-core)
-[![Release](https://img.shields.io/github/release/monkeyWie/gopeed-core.svg?style=flat-square)](https://github.com/monkeyWie/gopeed-core/releases)
+[![Test Status](https://github.com/monkeyWie/gopeed/workflows/test/badge.svg)](https://github.com/monkeyWie/gopeed/actions?query=workflow%3Atest)
+[![Codecov](https://codecov.io/gh/monkeyWie/gopeed/branch/master/graph/badge.svg)](https://codecov.io/gh/monkeyWie/gopeed)
+[![Release](https://img.shields.io/github/release/monkeyWie/gopeed.svg?style=flat-square)](https://github.com/monkeyWie/gopeed/releases)
 
 ## gopeed
 
@@ -9,7 +9,7 @@
 ## 安装
 
 ```sh
-go install github.com/monkeyWie/gopeed-core
+go install github.com/monkeyWie/gopeed
 ```
 
 ## 示例
@@ -24,18 +24,18 @@ go install github.com/monkeyWie/gopeed-core
 
 ### 下载
 
-前往[releases](https://github.com/monkeyWie/gopeed-core/releases)页面
+前往[releases](https://github.com/monkeyWie/gopeed/releases)页面
 
 ## TODO
 
 - [x] HTTP 下载实现
-- [ ] BitTorrent 下载实现
+- [x] BitTorrent 下载实现
   - [x] .torrent 文件解析
   - [x] tracker 协议实现
   - [x] peer wire protocol 协议实现
-  - [ ] DHT 协议实现
-  - [ ] 磁力链接支持
-  - [ ] uTP 协议实现
+  - [x] DHT 协议实现
+  - [x] 磁力链接支持
+  - [x] uTP 协议实现
 - [x] 下载接口抽象(不关心具体协议)
 - [ ] 支持自定义配置
 - [ ] 限速功能实现

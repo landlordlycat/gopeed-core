@@ -6,52 +6,171 @@ on:
       - master
     paths-ignore:
       - '_docs/**'
-      - 'README.md'
+      - '_examples/**'
+      - 'README*.md'
+
 jobs:
   release:
     runs-on: ubuntu-latest
+    outputs:
+      tag_name: ${{ steps.create_release.outputs.tag_name }}
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
 
     steps:
-      - uses: actions/setup-go@v2
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v3
         with:
-          go-version: '^1.15.2'
-      - uses: actions/checkout@v2
-      - name: Build Cli
-        run: |
-          CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags="-w -s" -o gopeed.exe cmd/gopeed/*
-          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o gopeed cmd/gopeed/*
-          CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -ldflags="-w -s" -o gopeed cmd/gopeed/*
-          zip gopeed-windows-x64.zip gopeed.exe
-          zip gopeed-linux-x64.zip gopeed
-          zip gopeed-darwin-x64.zip gopeed
+          go-version: '^1.19'
       - uses: release-drafter/release-drafter@v5
         id: create_release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Upload Cli Windows
-        uses: actions/upload-release-asset@v1.0.1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  build-cli:
+    runs-on: ubuntu-latest
+    needs: [ release ]
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v3
         with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps
-          asset_path: ./gopeed-windows-x64.zip
-          asset_name: gopeed-${{ steps.create_release.outputs.tag_name }}-windows-x64.zip
-          asset_content_type: application/zip
-      - name: Upload Cli Linux
-        uses: actions/upload-release-asset@v1.0.1
+          go-version: '^1.19'
+          cache: true
+      - name: Build
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.release.outputs.tag_name }}
+        run: |
+          mkdir -p dist/zip
+          goos_arr=(windows darwin linux)
+          goarch_arr=(386 amd64 arm arm64)
+          export CGO_ENABLED=0
+          for goos in "${goos_arr[@]}"; do
+            for goarch in "${goarch_arr[@]}"; do
+              dir="dist/gopeed-$VERSION-$goos-$goarch/"
+              (GOOS=$goos GOARCH=$goarch go build -tags nosqlite -ldflags="-s -w" -o $dir github.com/monkeyWie/gopeed/cmd/gopeed \
+              && cd $dir \
+              && zip -r ../zip/gopeed-cli-$VERSION-$goarch-$goos.zip * \
+              && cd ../..) \
+              || true
+            done
+          done
+      - name: Upload
+        uses: shogo82148/actions-upload-release-asset@v1
         with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps
-          asset_path: ./gopeed-linux-x64.zip
-          asset_name: gopeed-${{ steps.create_release.outputs.tag_name }}-linux-x64.zip
-          asset_content_type: application/zip
-      - name: Upload Cli Darwin
-        uses: actions/upload-release-asset@v1.0.1
+          upload_url: ${{ needs.release.outputs.upload_url }}
+          asset_path: dist/zip/*
+          overwrite: true
+  build-macos-arm64-lib:
+    runs-on: ubuntu-latest
+    needs: [ release ]
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v3
+        with:
+          go-version: '^1.19'
+          cache: true
+      - run: mkdir -p ~/image-cache
+      - id: image-cache
+        uses: actions/cache@v3
+        with:
+          path: ~/image-cache
+          key: image-cache-xgo-v1.19
+      - if: steps.image-cache.outputs.cache-hit != 'true'
+        run: |
+          docker pull techknowlogick/xgo:go-1.19.x
+          docker save -o ~/image-cache/xgo.tar techknowlogick/xgo:go-1.19.x
+      - if: steps.image-cache.outputs.cache-hit == 'true'
+        run: docker load -i ~/image-cache/xgo.tar
+      - name: Build
+        run: |
+          go install src.techknowlogick.com/xgo@latest
+          xgo --targets=darwin/arm64 -tags="nosqlite" -ldflags="-w -s" -buildmode=c-shared -pkg=bind/desktop -out=libgopeed .
+          mv libgopeed-*.dylib libgopeed.dylib
+      - uses: actions/upload-artifact@v3
+        with:
+          name: macos-arm64-lib
+          path: libgopeed.dylib
+  build-macos:
+    runs-on: macos-latest
+    needs: [ release, build-macos-arm64-lib ]
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v3
+        with:
+          go-version: '^1.19'
+          cache: true
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 16
+      - uses: subosito/flutter-action@v2
+      - name: Install appdmg
+        run: npm install -g appdmg
+      - uses: actions/download-artifact@v3
+        with:
+          name: macos-arm64-lib
+          path: ui/flutter/macos/Frameworks
+      - name: Build
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.release.outputs.tag_name }}
+        run: |
+          PROJECT_DIR=$(pwd)
+          
+          cd ui/flutter
+          flutter config --enable-macos-desktop
+          flutter build macos
+          cd build/macos/Build/Products/Release
+          cat>appdmg.json<<EOF
+          {
+            "title": "Gopeed",
+            "icon": "Gopeed.app/Contents/Resources/AppIcon.icns",
+            "contents": [
+              { "x": 448, "y": 344, "type": "link", "path": "/Applications" },
+              { "x": 192, "y": 344, "type": "file", "path": "Gopeed.app" }
+            ]
+          }
+          EOF
+          mkdir dist
+          appdmg appdmg.json dist/Gopeed-$VERSION-arm64-macos.dmg
+          
+          # amd64
+          cd $PROJECT_DIR
+          go build -tags nosqlite -ldflags="-w -s" -buildmode=c-shared -o bin/libgopeed.dylib github.com/monkeyWie/gopeed/bind/desktop
+          cp -rf bin/libgopeed.dylib ui/flutter/build/macos/Build/Products/Release/Gopeed.app/Contents/Frameworks/ github.com/monkeyWie/gopeed/bind/desktop
+          cd ui/flutter/build/macos/Build/Products/Release
+          appdmg appdmg.json dist/Gopeed-$VERSION-amd64-macos.dmg
+      - name: Upload
+        uses: shogo82148/actions-upload-release-asset@v1
         with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps
-          asset_path: ./gopeed-darwin-x64.zip
-          asset_name: gopeed-${{ steps.create_release.outputs.tag_name }}-darwin-x64.zip
-          asset_content_type: application/zip
+          upload_url: ${{ needs.release.outputs.upload_url }}
+          asset_path: ui/flutter/build/macos/Build/Products/Release/dist/*
+          overwrite: true
+  build-android:
+    runs-on: ubuntu-latest
+    needs: [ release ]
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v3
+        with:
+          go-version: '^1.19'
+          cache: true
+      - uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: '11'
+      - uses: subosito/flutter-action@v2
+      - name: Build
+        env:
+          VERSION: ${{ needs.release.outputs.tag_name }}
+        run: |
+          mkdir ui/flutter/android/app/libs
+          go install golang.org/x/mobile/cmd/gomobile@latest
+          gomobile init
+          gomobile bind -ldflags="-w -s" -o ui/flutter/android/app/libs/libgopeed.aar -target=android -androidapi 19 -javapkg=com.gopeed github.com/monkeyWie/gopeed/bind/mobile
+          cd ui/flutter
+          flutter build apk
+          mkdir dist
+          cp build/app/outputs/flutter-apk/app-release.apk dist/gopeed-$VERSION-android.apk
+      - name: Upload
+        uses: shogo82148/actions-upload-release-asset@v1
+        with:
+          upload_url: ${{ needs.release.outputs.upload_url }}
+          asset_path: ui/flutter/dist/*
+          overwrite: true

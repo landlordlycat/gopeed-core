@@ -2,13 +2,13 @@ package main
 
 import (
 	"fmt"
-	"github.com/monkeyWie/gopeed-core/pkg/base"
-	"github.com/monkeyWie/gopeed-core/pkg/download"
+	"github.com/monkeyWie/gopeed/pkg/base"
+	"github.com/monkeyWie/gopeed/pkg/download"
 )
 
 func main() {
 	finallyCh := make(chan error)
-	err := download.Boot().
+	_, err := download.Boot().
 		URL("https://www.baidu.com/index.html").
 		Listener(func(event *download.Event) {
 			if event.Key == download.EventKeyFinally {
